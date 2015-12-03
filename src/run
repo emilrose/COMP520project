@@ -1,0 +1,113 @@
+#!/bin/bash
+# "./run foo.go" tests foo.go
+# "./run foo.go -flag" or "./run foo.go -flag1 -flag2" tests foo.go and applies the flag(s)
+# "./run foo.go codegen" generates foo.c
+# "./run types" tests all programs in programs/invalid/types
+# "./run codegen" tests all programs in programs/valid/codegen
+# "./run valid" tests all programs in programs/valid/
+# "./run invalid" tests all programs in programs/invalid/
+# "./run all" tests all programs in programs/
+
+# no output unless the compiler fails a test
+# (i.e. accepts an invalid program or fails to parse a valid program)
+
+DIR="$(cd ../; pwd)"
+
+if test "$1" == "valid" || test "$1" == "all"
+then
+    COUNTER=0
+    echo ""
+    echo "*****TESTING VALID PROGRAMS*****"
+    echo ""
+    for f in $DIR/programs/valid/*.go;
+    do
+        if [ "$(java golite.Main $f)" ]
+        then
+            echo ${f#*/programs/valid/};
+            echo $(java golite.Main $f);
+	else
+	    java golite.Main $f $2 $3 $4;
+        fi
+        COUNTER=$[$COUNTER+1]
+    done
+    for f in $DIR/programs/valid/*/*.go;
+    do
+        if [ "$(java golite.Main $f)" ]
+        then
+            echo ${f#*/programs/valid/};
+            echo $(java golite.Main $f);
+	else
+	    java golite.Main $f $2 $3 $4;
+        fi
+        COUNTER=$[$COUNTER+1]
+    done
+    echo "*****************************************"
+    echo "Finished testing $COUNTER valid programs."
+    echo "*****************************************"
+    echo ""
+fi
+if test "$1" == "invalid" || test "$1" == "all"
+then
+    COUNTER=0
+    echo ""
+    echo "*****TESTING INVALID PROGRAMS*****"
+    echo ""
+    for f in $DIR/programs/invalid/*/*.go;
+    do
+        if [ ! "$(java golite.Main $f)" ]; then
+        echo ${f#*/programs/invalid/};
+        echo $(java golite.Main $f);
+        fi
+	COUNTER=$[$COUNTER+1]
+    done
+    echo "*****************************************"
+    echo "Finished testing $COUNTER invalid programs."
+    echo "*****************************************"
+    echo ""
+elif test "$1" == "types"
+then
+    for f in $DIR/programs/invalid/types/*.go
+    do
+	if [ ! "$(java golite.Main $f)" ]; then
+	echo ${f#*/programs/invalid/};
+        echo $(java golite.Main $f);
+        fi
+	COUNTER=$[$COUNTER+1]
+    done   
+    for f in $DIR/programs/invalid/more_type_errors/*.go
+    do
+	if [ ! "$(java golite.Main $f)" ]; then
+	echo ${f#*/programs/invalid/};
+        echo $(java golite.Main $f);
+        fi
+	COUNTER=$[$COUNTER+1]
+    done 
+    echo "*****************************************"
+    echo "Finished testing $COUNTER programs with type errors."
+    echo "*****************************************"
+    echo ""  
+elif test "$1" == "codegen"
+then
+    for f in $DIR/programs/valid/codegen/*.go
+    do
+	if [ "$(java golite.Main $f $1)" ]; then
+	echo ${f#*/programs/valid/};
+        echo $(java golite.Main $f $1);
+        fi
+	COUNTER=$[$COUNTER+1]
+    done   
+    echo "*****************************************"
+    echo "Finished testing $COUNTER programs."
+    echo "*****************************************"
+    echo "" 
+else
+    if test "$1" != "valid"
+    then
+	java golite.Main $1 $2 $3 $4
+    fi
+fi
+
+
+
+
+

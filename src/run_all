@@ -1,0 +1,44 @@
+#!/bin/bash
+# "./run_all types" tests all invalid programs in programs/invalid/types
+# "./run_all valid" tests all programs in programs/valid/
+# "./run_all invalid" tests all programs in programs/invalid/
+# "./run_all" tests all programs in programs/
+
+# outputs program names and error messages
+
+DIR="$(cd ../; pwd)"
+
+if test "$1" == "valid" || test "$1" == ""
+then
+    echo ""
+    echo "*****TESTING VALID PROGRAMS*****"
+    for f in $DIR/programs/valid/*.go;
+    do echo ${f#*/programs/valid/}; java golite.Main $f;
+    done
+    for f in $DIR/programs/valid/*/*.go;
+    do echo ${f#*/programs/valid/}; java golite.Main $f;
+    done
+    echo ""
+fi
+if test "$1" == "invalid" || test "$1" == ""
+then
+    echo ""
+    echo "*****TESTING INVALID PROGRAMS*****"
+    echo ""
+    for f in $DIR/programs/invalid/*/*.go;
+    do echo ${f#*/programs/invalid/}; java golite.Main $f; echo "";
+    done
+fi
+if test "$1" == "types"
+then
+    echo ""
+    echo "*****TESTING TYPE ERROR PROGRAMS*****"
+    echo ""
+    for f in $DIR/programs/invalid/types/*.go
+    do echo ${f#*/programs/invalid/}; java golite.Main $f; echo "";
+    done
+    for f in $DIR/programs/invalid/more_type_errors/*.go
+    do echo ${f#*/programs/invalid/}; java golite.Main $f; echo "";
+    done
+fi
+    

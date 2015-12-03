@@ -1,0 +1,8 @@
+#!/bin/sh
+rm *.class *.j
+$PEEPDIR/joosc *.java *.joos
+wc -l *.j
+$PEEPDIR/joosc -O *.java *.joos
+wc -l *.j
+java Main < in1
+

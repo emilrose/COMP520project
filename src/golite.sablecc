@@ -1,0 +1,563 @@
+Package golite;
+
+Helpers
+
+any             = [0..255];
+tab             = 9;
+cr              = 13;
+lf              = 10;
+not_lf          = [any - lf];
+not_lf_quote    = [not_lf - '''];
+not_lf_quotes   = [not_lf - '"'];
+not_lf_quotes_bslash = [not_lf_quotes - '\'];
+not_lf_space    = cr | tab | ' ';
+not_star        = [any - '*'];
+not_star_slash  = [not_star - '/'];
+dec_digit       = ['0'..'9'];
+oct_digit       = ['0'..'7'];
+hex_digit       = dec_digit | ['a'..'f'] | ['A'..'F'];
+dec_lit         = [dec_digit - '0'] dec_digit*;
+oct_lit         = '0' oct_digit*;
+hex_lit         = '0' ('x' | 'X') hex_digit hex_digit*;
+esc_char        = '\' ('a' | 'b' | 'f' | 'n' | 'r' | 't' | 'v' | '\' | ''');
+esc_quotes      = '\"';
+raw_str         = '`' [any - '`']* '`';
+interp_str      = '"' (not_lf_quotes_bslash | esc_char | esc_quotes)* '"';
+letter          = ['A'..'Z'] | ['a'..'z'];
+blank           = '_';
+id_char         = letter | blank;
+id_suffix_char  = id_char | dec_digit;
+
+
+Tokens
+
+// Go keywords
+break       = 'break';
+case        = 'case';
+chan        = 'chan';
+const       = 'const';
+continue    = 'continue';
+default     = 'default';
+defer       = 'defer';
+else        = 'else';
+fallthrough = 'fallthrough';
+for         = 'for';
+func 	    = 'func';
+go          = 'go';
+goto        = 'goto';
+if          = 'if';
+import      = 'import';
+interface   = 'interface';
+map         = 'map';
+package     = 'package';
+range       = 'range';
+return      = 'return';
+select      = 'select';
+struct      = 'struct';
+switch      = 'switch';
+type_k      = 'type';
+var         = 'var';
+
+// additional keywords
+append      = 'append';
+bool        = 'bool';
+float64     = 'float64';
+int         = 'int';
+print       = 'print';
+println     = 'println';
+rune        = 'rune';
+string      = 'string';
+
+// operators
+plus        = '+';
+minus       = '-';
+star        = '*';
+slash       = '/';
+mod         = '%';
+amp         = '&';
+pipe        = '|';
+caret       = '^';
+l_shift     = '<<';
+r_shift     = '>>';
+amp_caret   = '&^';
+plus_eq     = '+=';
+minus_eq    = '-=';
+star_eq     = '*=';
+slash_eq    = '/=';
+mod_eq      = '%=';
+amp_eq      = '&=';
+pipe_eq     = '|=';
+caret_eq    = '^=';
+l_shift_eq  = '<<=';
+r_shift_eq  = '>>=';
+amp_caret_eq= '&^=';
+amp_amp     = '&&';
+pipe_pipe   = '||';
+l_arrow     = '<-';
+plus_plus   = '++';
+minus_minus = '--';
+eq_eq       = '==';
+lt          = '<';
+gt          = '>';
+eq          = '=';
+bang        = '!';
+neq         = '!=';
+leq         = '<=';
+geq         = '>=';
+colon_eq    = ':=';
+ellipsis    = '...';
+l_paren     = '(';
+r_paren     = ')';
+l_bracket   = '[';
+r_bracket   = ']';
+l_brace     = '{';
+r_brace     = '}';
+comma       = ',';
+dot         = '.';
+colon       = ':';
+semi        = ';';
+
+// literals
+int_lit     = dec_lit | oct_lit | hex_lit;
+float_lit   = dec_digit+ '.' dec_digit* | dec_digit* '.' dec_digit+;
+rune_lit    = ''' (not_lf_quote | esc_char) ''';
+str_lit     = raw_str | interp_str;
+
+// identifiers
+id          = letter id_suffix_char* | blank id_suffix_char+;
+blank       = blank;
+
+// comments
+line_comment  = '//' not_lf* lf?;
+block_comment = '/*' not_star* '*'+ (not_star_slash not_star* '*'+)* '/';
+
+// whitespace
+newline      = lf;
+not_lf_space = not_lf_space;
+
+
+
+Ignored Tokens
+
+line_comment, block_comment, not_lf_space, newline;
+
+
+
+Productions
+
+program {-> program} = package id semi declaration*
+{-> New program(id, [declaration.stmt])}
+;
+
+declaration {-> stmt*} = {var_dec} var_dec semi
+{-> [var_dec.stmt]}
+| {type_dec} type_dec semi
+{-> [type_dec.stmt]}
+| {func_dec} func_dec semi
+{-> [func_dec.stmt]}
+;
+
+var_dec {-> stmt*} = {long_var_dec} var l_paren var_dec_short_semi* r_paren
+{-> [var_dec_short_semi.stmt]}
+| {short_var_dec} var var_dec_short
+{-> [var_dec_short.stmt]}
+;
+
+var_dec_short_semi {-> stmt} = var_dec_short semi
+{-> var_dec_short.stmt}
+;
+
+var_dec_short {-> stmt} = {var_type} id_list type
+{-> New stmt.var_dec([id_list.exp], type, [])}
+| {var_exp} id_list type? eq exp_list
+{-> New stmt.var_dec([id_list.exp], type, [exp_list.exp])}
+;
+
+type_dec {-> stmt*} = {block} type_k l_paren type_dec_short_semi* r_paren
+{-> [type_dec_short_semi.stmt]}
+| {simple} type_k type_dec_short
+{-> [type_dec_short.stmt]}
+;
+
+type_dec_short_semi {-> stmt} = type_dec_short semi
+{-> type_dec_short.stmt}
+;
+
+type_dec_short {-> stmt} = id_or_blank type
+{-> New stmt.type_dec(id_or_blank.exp, type)}
+;
+
+id_or_blank {-> exp}  = {id} id           {-> New exp.id(id)}
+| {blank} blank     {-> New exp.blank(blank)}
+;
+
+id_list {-> exp*} = {id} id_or_blank
+{-> [id_or_blank.exp] }
+| {list} id_list comma id_or_blank
+{-> [id_list.exp, id_or_blank.exp]}
+;
+
+func_dec {-> stmt} = func id_or_blank l_paren id_type_list? r_paren type? block
+{-> New stmt.func_dec(id_or_blank.exp, [id_type_list.ids_type], type, [block.stmt])}
+;
+
+id_type_list {-> ids_type*} = {single} id_list type
+{-> [New ids_type([id_list.exp], type)]}
+| {list} id_type_list comma id_list type
+{-> [id_type_list.ids_type, New ids_type([id_list.exp], type)]}
+;
+
+block {-> stmt*} = l_brace body r_brace
+{-> [body.stmt]}
+;
+
+body {-> stmt} = stmt*
+{-> New stmt.block([stmt.stmt])}
+;
+
+stmt {-> stmt*} = {simple} simple_stmt semi   		{-> [simple_stmt.stmt] }
+| {non_simple} non_simple_stmt semi                 {-> [non_simple_stmt.stmt]}
+;
+
+simple_stmt {-> stmt} = {empty}     {-> New stmt.empty() }
+| {exp} exp                         {-> New stmt.exp(exp.exp) }
+| {assign} assign_stmt              {-> assign_stmt.stmt }
+| {short_decl} short_decl_stmt      {-> short_decl_stmt.stmt }
+| {inc_dec} inc_dec_stmt            {-> inc_dec_stmt.stmt }
+;
+
+non_simple_stmt {-> stmt*} = {type_dec} type_dec    {-> [type_dec.stmt] }
+| {var_dec} var_dec                 {-> [var_dec.stmt] }
+| {print} print_stmt                {-> [print_stmt.stmt] }
+| {return} return_stmt              {-> [return_stmt.stmt] }
+| {if} if_stmt                      {-> [if_stmt.stmt]}
+| {switch} switch_stmt              {-> [switch_stmt.stmt]}
+| {for} for_stmt                    {-> [for_stmt.stmt]}
+| {break_cont} break_cont_stmt      {-> [break_cont_stmt.stmt]}
+| {block} block                     {-> [block.stmt]}
+;
+
+assign_stmt {-> stmt} = {assign_eq} lvalue_list eq exp_list
+{-> New stmt.assign_eq([lvalue_list.exp], [exp_list.exp])}
+| {plus_eq} lvalue plus_eq exp
+{-> New stmt.plus_eq(lvalue.exp, exp.exp)}
+| {minus_eq} lvalue minus_eq exp
+{-> New stmt.minus_eq(lvalue.exp, exp.exp)}
+| {star_eq} lvalue star_eq exp
+{-> New stmt.star_eq(lvalue.exp, exp.exp)}
+| {slash_eq} lvalue slash_eq exp
+{-> New stmt.slash_eq(lvalue.exp, exp.exp)}
+| {mod_eq} lvalue mod_eq exp
+{-> New stmt.mod_eq(lvalue.exp, exp.exp)}
+| {amp_eq} lvalue amp_eq exp
+{-> New stmt.amp_eq(lvalue.exp, exp.exp)}
+| {l_shift_eq} lvalue l_shift_eq exp
+{-> New stmt.l_shift_eq(lvalue.exp, exp.exp)}
+| {r_shift_eq} lvalue r_shift_eq exp
+{-> New stmt.r_shift_eq(lvalue.exp, exp.exp)}
+| {amp_caret_eq} lvalue amp_caret_eq exp
+{-> New stmt.amp_caret_eq(lvalue.exp, exp.exp)}
+| {pipe_eq} lvalue pipe_eq exp
+{-> New stmt.pipe_eq(lvalue.exp, exp.exp)}
+| {caret_eq} lvalue caret_eq exp
+{-> New stmt.caret_eq(lvalue.exp, exp.exp)}
+;
+
+lvalue_list {-> exp*} = {lvalue} lvalue         {-> [lvalue.exp] }
+| {blank} blank                                 {-> [New exp.blank(blank)]}
+| {list} lvalue_list comma lvalue               {-> [lvalue_list.exp, lvalue.exp]}
+| {list_blank} lvalue_list comma blank          {-> [lvalue_list.exp, New exp.blank(blank)]}
+;
+
+lvalue {-> exp} = {id} id           {-> New exp.id(id)}
+| {selector} selector               {-> selector.exp}
+| {indexing} indexing               {-> indexing.exp}
+| {func_call} func_call             {-> func_call.exp}
+;
+
+selector {-> exp} = lvalue dot id
+{-> New exp.selector (lvalue.exp, id) }
+;
+
+indexing {-> exp} = lvalue l_bracket exp r_bracket
+{-> New exp.indexing (lvalue.exp, exp.exp) }
+;
+
+short_decl_stmt {-> stmt} = {short_decl_stmt} lvalue_list colon_eq exp_list
+{-> New stmt.short_decl([lvalue_list.exp], [exp_list.exp])}
+;
+
+inc_dec_stmt {-> stmt} = {inc} lvalue plus_plus     {-> New stmt.inc(lvalue.exp)}
+| {dec} lvalue minus_minus             {-> New stmt.dec(lvalue.exp)}
+;
+
+print_stmt {-> stmt} = {print} print l_paren exp_list? r_paren
+{-> New stmt.print(print, [exp_list.exp])}
+| {println} println l_paren exp_list? r_paren
+{-> New stmt.println(println, [exp_list.exp])}
+;
+
+return_stmt {-> stmt} = return exp?     {-> New stmt.return(return, exp.exp)}
+;
+
+
+if_stmt {-> stmt}  = if simple_stmt_semi? exp block opt_else_if_list opt_else
+{-> New stmt.if(if, simple_stmt_semi.stmt, exp.exp,
+[block.stmt], [opt_else_if_list.else_if], [opt_else.stmt])}
+;
+
+opt_else_if_list {-> else_if*} = {emptylist} /* empty */        {-> []}
+| {list} opt_else_if_list else_if
+{-> [opt_else_if_list.else_if, else_if.else_if]}
+;
+
+else_if {-> else_if} = else if simple_stmt_semi? exp block
+{-> New else_if(simple_stmt_semi.stmt, exp, [block.stmt]) }
+;
+
+opt_else {-> stmt*} = {empty} /* empty */           {-> [] }
+| {list}  else block            {-> [block.stmt]}
+;
+
+
+switch_stmt {-> stmt} = switch simple_stmt_semi? exp? l_brace switch_exp* r_brace
+{-> New stmt.switch(switch, simple_stmt_semi.stmt, exp.exp, [switch_exp])}
+;
+
+simple_stmt_semi {-> stmt} = simple_stmt semi     {-> simple_stmt.stmt}
+;
+
+switch_exp {-> switch_exp} = {case} case exp_list colon body
+{-> New switch_exp([exp_list.exp], [body.stmt])}
+| {default} default colon body
+{-> New switch_exp([], [body.stmt])}
+;
+
+
+for_stmt {-> stmt}  = {infinite} for block
+{-> New stmt.infinite_loop(for, [block.stmt])}
+| {while} for exp block
+{-> New stmt.while(for, exp, [block.stmt])}
+| {three_part} for [init_stmt]:simple_stmt [semi1]:semi exp?
+[semi2]:semi [post_stmt]:simple_stmt block
+{-> New stmt.for(for, init_stmt.stmt, exp.exp, post_stmt.stmt, [block.stmt])}
+;
+
+break_cont_stmt {-> stmt} = {break} break   {-> New stmt.break(break)}
+| {continue} continue           {-> New stmt.continue(continue)}
+;
+
+type {-> type} = {basic} basic_type     {-> basic_type.type }
+| {slice} slice_type        {-> slice_type.type }
+| {array} array_type        {-> array_type.type }
+| {struct} struct_type      {-> struct_type.type }
+| {alias} id                {-> New type.alias(id) }
+;
+
+basic_type {-> type } 	= {int} int		{-> New type.int(int) }
+| {float} float64       {-> New type.float(float64) }
+| {bool} bool           {-> New type.bool(bool) }
+| {rune} rune           {-> New type.rune(rune) }
+| {string} string       {-> New type.string(string)}
+;
+
+slice_type {-> type} = {slice} l_bracket r_bracket type       {-> New type.slice(type.type) }
+;
+
+array_type {-> type} = {array_type} l_bracket int_lit r_bracket type
+{-> New type.array (int_lit, type.type) }
+;
+
+struct_type {-> type} = {struct} struct l_brace field_dec* r_brace
+{-> New type.struct([field_dec.field]) }
+;
+
+field_dec {-> field} = {field} id_list type semi
+{-> New field([id_list.exp], type.type) }
+;
+
+exp_list {-> exp*} = {exp} exp                      {-> [exp.exp]}
+| {list} exp_list comma exp     {-> [exp_list.exp, exp.exp]}
+;
+
+
+
+/* ----- EXPRESSIONS ------ */
+
+exp {-> exp} = {simple} prec1       {-> prec1.exp}
+;
+
+prec1 {-> exp}  = {bin_or} prec1 pipe_pipe prec2    {-> New exp.bin_or (prec1.exp, prec2.exp) }
+| {simple} prec2                    {-> prec2.exp }
+;
+
+prec2 {-> exp}  = {bin_and} prec2 amp_amp prec3     {-> New exp.bin_and (prec2.exp, prec3.exp)}
+| {simple} prec3				{-> prec3.exp}
+;
+
+prec3 {-> exp} = {eq} prec3 eq_eq prec4             {-> New exp.eq (prec3.exp, prec4.exp) }
+| {neq} prec3 neq prec4             {-> New exp.neq (prec3.exp, prec4.exp) }
+| {lt} prec3 lt prec4               {-> New exp.lt (prec3.exp, prec4.exp) }
+| {leq} prec3 leq prec4             {-> New exp.leq (prec3.exp, prec4.exp) }
+| {gt} prec3 gt prec4               {-> New exp.gt (prec3.exp, prec4.exp) }
+| {geq} prec3 geq prec4             {-> New exp.geq (prec3.exp, prec4.exp) }
+| {simple} prec4                    {-> prec4.exp }
+;
+
+
+prec4 {-> exp} = {plus} prec4 plus prec5            {-> New exp.plus (prec4.exp, prec5.exp) }
+| {minus} prec4 minus prec5         {-> New exp.minus (prec4.exp, prec5.exp) }
+| {pipe} prec4 pipe prec5           {-> New exp.pipe (prec4.exp, prec5.exp) }
+| {caret} prec4 caret prec5         {-> New exp.caret (prec4.exp, prec5.exp) }
+| {simple} prec5                    {-> prec5.exp}
+;
+
+prec5 {-> exp} = {star} prec5 star unary            {-> New exp.star (prec5.exp, unary.exp) }
+| {slash} prec5 slash unary         {-> New exp.slash (prec5.exp, unary.exp) }
+| {mod} prec5 mod unary             {-> New exp.mod (prec5.exp, unary.exp) }
+| {l_shift} prec5 l_shift unary     {-> New exp.l_shift (prec5.exp, unary.exp) }
+| {r_shift} prec5 r_shift unary     {-> New exp.r_shift (prec5.exp, unary.exp) }
+| {amp} prec5 amp unary             {-> New exp.amp (prec5.exp, unary.exp) }
+| {amp_caret} prec5 amp_caret unary {-> New exp.amp_caret (prec5.exp, unary.exp) }
+| {simple} unary                    {-> unary.exp}
+;
+
+
+unary {-> exp} = {primary} primary          {-> primary.exp}
+| {plus} plus unary         {-> New exp.u_plus (unary.exp) }
+| {minus} minus unary		{-> New exp.u_minus (unary.exp) }
+| {bang} bang unary         {-> New exp.u_bang (unary.exp) }
+| {caret} caret unary		{-> New exp.u_caret (unary.exp) }
+;
+
+primary {-> exp} = {type_cast} basic_type l_paren exp r_paren
+{-> New exp.type_cast(basic_type.type, exp.exp)}
+| {selector} selector
+{-> selector.exp}
+| {indexing} indexing
+{-> indexing.exp}
+| {func_call} func_call
+{-> func_call.exp}
+| {append} append l_paren id comma exp r_paren
+{-> New exp.append(id, exp)}
+| {operand} operand
+{-> operand.exp}
+;
+
+func_call {->exp} = {func_call} primary l_paren exp_list? r_paren
+{-> New exp.func_call(primary.exp, [exp_list.exp])}
+;
+
+operand {-> exp} = {lit} literal                        {-> literal.exp}
+| {id} id                           {-> New exp.id (id)}
+| {paren} l_paren exp r_paren       {-> exp.exp}
+;
+
+literal {-> exp} = {int} int_lit    {-> New exp.int(int_lit)}
+| {float} float_lit     {-> New exp.float(float_lit)}
+| {rune} rune_lit       {-> New exp.rune(rune_lit)}
+| {str} str_lit         {-> New exp.str(str_lit)}
+;
+
+
+
+
+Abstract Syntax Tree
+
+program = id stmt*
+;
+
+stmt = {empty}
+| {var_dec} [id]:exp* type? [val]:exp*
+| {type_dec} exp type
+| {func_dec} exp ids_type* type? stmt*
+| {exp} exp
+| {assign_eq} [l]:exp+ [r]:exp+
+| {plus_eq} [l]:exp [r]:exp
+| {minus_eq} [l]:exp [r]:exp
+| {star_eq} [l]:exp [r]:exp
+| {slash_eq} [l]:exp [r]:exp
+| {mod_eq} [l]:exp [r]:exp
+| {amp_eq} [l]:exp [r]:exp
+| {l_shift_eq} [l]:exp [r]:exp
+| {r_shift_eq} [l]:exp [r]:exp
+| {amp_caret_eq} [l]:exp [r]:exp
+| {pipe_eq} [l]:exp [r]:exp
+| {caret_eq} [l]:exp [r]:exp
+| {short_decl} [l]:exp+ [r]:exp+
+| {inc} exp
+| {dec} exp
+| {print} print exp*
+| {println} println exp*
+| {return} return exp?
+| {if} if stmt? exp [true]:stmt* else_if* [false]:stmt*
+| {switch} switch stmt? exp? switch_exp*
+| {infinite_loop} for stmt*
+| {while} for exp stmt*
+| {for} for [init]:stmt exp? [cond]:stmt [body]:stmt*
+| {break} break
+| {continue} continue
+| {block} stmt*
+;
+
+ids_type = exp* type
+;
+
+else_if = stmt? exp [body]:stmt*
+;
+
+switch_exp = exp* stmt*
+;
+
+type = {int} int
+| {float} float64
+| {bool} bool
+| {rune} rune
+| {string} string
+| {slice} type
+| {array} int_lit type
+| {struct} field*
+| {alias} id
+;
+
+field = exp* type
+;
+
+exp = {bin_or} [l]:exp [r]:exp
+| {bin_and} [l]:exp [r]:exp
+| {eq} [l]:exp [r]:exp
+| {neq} [l]:exp [r]:exp
+| {lt} [l]:exp [r]:exp
+| {leq} [l]:exp [r]:exp
+| {gt} [l]:exp [r]:exp
+| {geq} [l]:exp [r]:exp
+| {plus} [l]:exp [r]:exp
+| {minus} [l]:exp [r]:exp
+| {pipe} [l]:exp [r]:exp
+| {caret} [l]:exp [r]:exp
+| {star} [l]:exp [r]:exp
+| {slash} [l]:exp [r]:exp
+| {mod} [l]:exp [r]:exp
+| {l_shift} [l]:exp [r]:exp
+| {r_shift} [l]:exp [r]:exp
+| {amp} [l]:exp [r]:exp
+| {amp_caret} [l]:exp [r]:exp
+| {u_plus} exp
+| {u_minus} exp
+| {u_bang} exp
+| {u_caret} exp
+| {type_cast} type exp
+| {selector} exp id
+| {indexing} [array]:exp [index]:exp
+| {func_call} [name]:exp [param]:exp*
+| {append} id exp
+| {int} int_lit
+| {float} float_lit
+| {rune} rune_lit
+| {str} str_lit
+| {id} id
+| {blank} blank
+;
+
+
+
