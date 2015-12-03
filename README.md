@@ -4,7 +4,9 @@ This is a compiler for a subset of Go, targeting C.
 
 This project was done in collaboration with Zoe Guan and Samuel Laferriere for the McGill course COMP520 - Compiler Design.
 
-If you are a current student of COMP520, please do not copy this code or use it as a reference outside of the bounds of what Professor Hendren allows.
+I worked primarily on the parser and AST, weeder, and type checker.
+
+This project is provided publically as portfolio work with the permission of Laure Hendren. If you are a current student of COMP520, please do not copy this code or use it as a reference outside of the bounds of what Professor Hendren allows.
   
 The Makefile and test scripts are in /src.  
   
