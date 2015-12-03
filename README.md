@@ -1,6 +1,6 @@
 # CS520 Group Project
 
-This is a compiler for a subset of Go, targeting C.
+This is a compiler for a subset of Go, targeting C. The project was built using [http://www.sablecc.org/](SableCC), a Java parser generator created by Etienne Gagnon.
 
 This project was done in collaboration with Zoe Guan and Samuel Laferriere for the McGill course COMP520 - Compiler Design.
 
